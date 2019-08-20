@@ -27,6 +27,9 @@ import importlib
 import math
 import multiprocessing
 
+# set gpu devices
+os.environ['CUDA_VISIBLE_DEVICES'] = "4,5"
+
 def _run_forwarding_in_subprocesses(config):
     use_cuda=strtobool(config['exp']['use_cuda'])
     if use_cuda:
@@ -85,7 +88,7 @@ cfg_file_proto_chunk=config['cfg_proto']['cfg_proto_chunk']
 
 cmd=config['exp']['cmd']
 N_ep=int(config['exp']['N_epochs_tr'])
-N_ep_str_format='0'+str(max(math.ceil(np.log10(N_ep)),1))+'d'
+N_ep_str_format='0'+str(int(max(math.ceil(np.log10(N_ep)),1)))+'d'
 tr_data_lst=config['data_use']['train_with'].split(',')
 valid_data_lst=config['data_use']['valid_with'].split(',')
 forward_data_lst=config['data_use']['forward_with'].split(',')
@@ -186,7 +189,7 @@ for ep in range(N_ep):
         
         # Compute the total number of chunks for each training epoch
         N_ck_tr=compute_n_chunks(out_folder,tr_data,ep,N_ep_str_format,'train')
-        N_ck_str_format='0'+str(max(math.ceil(np.log10(N_ck_tr)),1))+'d'
+        N_ck_str_format='0'+str(int(max(math.ceil(np.log10(N_ck_tr)),1)))+'d'
      
         # ***Epoch training***
         for ck in range(N_ck_tr):
@@ -250,7 +253,7 @@ for ep in range(N_ep):
                 valid_peformance_dict = {}  
                 for valid_data in valid_data_lst:
                     N_ck_valid = compute_n_chunks(out_folder, valid_data, ep, N_ep_str_format, 'valid')
-                    N_ck_str_format_val = '0' + str(max(math.ceil(np.log10(N_ck_valid)), 1)) + 'd'
+                    N_ck_str_format_val = '0' + str(int(max(math.ceil(np.log10(N_ck_valid)), 1))) + 'd'
                     for ck_val in range(N_ck_valid):
                         info_file = get_val_info_file_path(out_folder, valid_data, ep, ck, ck_val, N_ep_str_format, N_ck_str_format, N_ck_str_format_val)
                         config_chunk_file = get_val_cfg_file_path(out_folder, valid_data, ep, ck, ck_val, N_ep_str_format, N_ck_str_format, N_ck_str_format_val)
@@ -300,7 +303,7 @@ for forward_data in forward_data_lst:
            
          # Compute the number of chunks
          N_ck_forward=compute_n_chunks(out_folder,forward_data,ep,N_ep_str_format,'forward')
-         N_ck_str_format='0'+str(max(math.ceil(np.log10(N_ck_forward)),1))+'d'
+         N_ck_str_format='0'+str(int(max(math.ceil(np.log10(N_ck_forward)),1)))+'d'
          
          processes = list()
          info_files = list()

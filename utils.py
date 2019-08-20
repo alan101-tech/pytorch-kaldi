@@ -763,7 +763,7 @@ def create_configs(config):
     # This function create the chunk-specific config files
     cfg_file_proto_chunk=config['cfg_proto']['cfg_proto_chunk']
     N_ep=int(config['exp']['N_epochs_tr'])
-    N_ep_str_format='0'+str(max(math.ceil(np.log10(N_ep)),1))+'d'
+    N_ep_str_format='0'+str(int(max(math.ceil(np.log10(N_ep)),1)))+'d'
     tr_data_lst=config['data_use']['train_with'].split(',')
     valid_data_lst=config['data_use']['valid_with'].split(',')
     max_seq_length_train=config['batches']['max_seq_length_train']
@@ -846,7 +846,7 @@ def create_configs(config):
             
             # Compute the total number of chunks for each training epoch
             N_ck_tr=compute_n_chunks(out_folder,tr_data,ep,N_ep_str_format,'train')
-            N_ck_str_format='0'+str(max(math.ceil(np.log10(N_ck_tr)),1))+'d'
+            N_ck_str_format='0'+str(int(max(math.ceil(np.log10(N_ck_tr)),1)))+'d'
          
             # ***Epoch training***
             for ck in range(N_ck_tr):
@@ -884,7 +884,7 @@ def create_configs(config):
                 if do_validation_after_chunk(ck, N_ck_tr, config):
                     for valid_data in valid_data_lst:
                         N_ck_valid = compute_n_chunks(out_folder,valid_data,ep,N_ep_str_format,'valid')
-                        N_ck_str_format_val = '0'+str(max(math.ceil(np.log10(N_ck_valid)),1))+'d'
+                        N_ck_str_format_val = '0'+str(int(max(math.ceil(np.log10(N_ck_valid)),1)))+'d'
                         for ck_val in range(N_ck_valid):
                             lst_file = get_val_lst_file_path(out_folder, valid_data, ep, ck, ck_val, None, N_ep_str_format, N_ck_str_format, N_ck_str_format_val)
                             info_file = get_val_info_file_path(out_folder, valid_data, ep, ck, ck_val, N_ep_str_format, N_ck_str_format, N_ck_str_format_val)
@@ -904,7 +904,7 @@ def create_configs(config):
                
              # Compute the number of chunks
              N_ck_forward=compute_n_chunks(out_folder,forward_data,ep,N_ep_str_format,'forward')
-             N_ck_str_format='0'+str(max(math.ceil(np.log10(N_ck_forward)),1))+'d'
+             N_ck_str_format='0'+str(int(max(math.ceil(np.log10(N_ck_forward)),1)))+'d'
              
              for ck in range(N_ck_forward):
                         
@@ -945,7 +945,7 @@ def create_lists(config):
     out_folder=config['exp']['out_folder']
     seed=int(config['exp']['seed'])
     N_ep=int(config['exp']['N_epochs_tr'])    
-    N_ep_str_format='0'+str(max(math.ceil(np.log10(N_ep)),1))+'d'
+    N_ep_str_format='0'+str(int(max(math.ceil(np.log10(N_ep)),1)))+'d'
     
     # Setting the random seed
     random.seed(seed)
@@ -959,7 +959,7 @@ def create_lists(config):
         [fea_names,list_fea,fea_opts,cws_left,cws_right]=parse_fea_field(config[cfg_item2sec(config,'data_name',dataset)]['fea'])
 
         N_chunks= int(config[sec_data]['N_chunks'])
-        N_ck_str_format='0'+str(max(math.ceil(np.log10(N_chunks)),1))+'d'
+        N_ck_str_format='0'+str(int(max(math.ceil(np.log10(N_chunks)),1)))+'d'
          
         full_list=[]
         
@@ -998,7 +998,7 @@ def create_lists(config):
                         sec_data = cfg_item2sec(config,'data_name',dataset_val)
                         fea_names, list_fea, fea_opts, cws_left, cws_right = parse_fea_field(config[cfg_item2sec(config,'data_name',dataset_val)]['fea'])
                         N_chunks_val = int(config[sec_data]['N_chunks'])
-                        N_ck_str_format_val = '0'+str(max(math.ceil(np.log10(N_chunks_val)),1))+'d'
+                        N_ck_str_format_val = '0'+str(int(max(math.ceil(np.log10(N_chunks_val)),1)))+'d'
                         valid_chunks_fea = _get_validation_data_for_chunks(fea_names, list_fea, N_chunks_val)
                         for ck_val in range(N_chunks_val):
                             for fea_idx in range(len(fea_names)):
@@ -1020,7 +1020,7 @@ def create_lists(config):
         [fea_names,list_fea,fea_opts,cws_left,cws_right]=parse_fea_field(config[cfg_item2sec(config,'data_name',dataset)]['fea'])
 
         N_chunks= int(config[sec_data]['N_chunks'])
-        N_ck_str_format='0'+str(max(math.ceil(np.log10(N_chunks)),1))+'d'
+        N_ck_str_format='0'+str(int(max(math.ceil(np.log10(N_chunks)),1)))+'d'
         
         full_list=[]
         

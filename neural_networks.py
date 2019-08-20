@@ -1,3 +1,4 @@
+#coding:utf8
 ##########################################################
 # pytorch-kaldi v.0.1                                      
 # Mirco Ravanelli, Titouan Parcollet
