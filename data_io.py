@@ -217,7 +217,7 @@ def load_chunk(fea_scp,fea_opts,lab_folder,lab_opts,left,right,max_sequence_leng
   end_index_fea[-1]=end_index_fea[-1]-right
 
   # mean and variance normalization
-  data_set=(data_set-np.mean(data_set,axis=0))/np.std(data_set,axis=0)
+  #data_set=(data_set-np.mean(data_set,axis=0))/np.std(data_set,axis=0)
 
   # Label processing
   data_lab=data_lab-data_lab.min()

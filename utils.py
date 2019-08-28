@@ -1617,6 +1617,7 @@ def dict_fea_lab_arch(config, fea_only):
     
     for line in model:
         [out_name,operation,inp1,inp2]=list(re.findall(pattern,line)[0])
+        print(line)
         
         if inp1 in fea_lst and inp1 not in fea_lst_used_name :
             pattern_fea="fea_name="+inp1+"\nfea_lst=(.*)\nfea_opts=(.*)\ncw_left=(.*)\ncw_right=(.*)"
@@ -2100,7 +2101,7 @@ def dump_epoch_results(res_file_path, ep, tr_data_lst, tr_loss_tot, tr_error_tot
     # Default terminal line size is 80 characters, try new dispositions to fit this limit
     #
 
-    N_ep_str_format='0'+str(max(math.ceil(np.log10(N_ep)),1))+'d'
+    N_ep_str_format='0'+str(int(max(math.ceil(np.log10(N_ep)),1)))+'d'
     res_file = open(res_file_path, "a")
     res_file.write('ep=%s tr=%s loss=%s err=%s ' %(format(ep, N_ep_str_format),tr_data_lst,format(tr_loss_tot/len(tr_data_lst), "0.3f"),format(tr_error_tot/len(tr_data_lst), "0.3f")))
     print(' ')

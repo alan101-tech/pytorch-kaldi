@@ -28,7 +28,7 @@ import math
 import multiprocessing
 
 # set gpu devices
-os.environ['CUDA_VISIBLE_DEVICES'] = "4,5"
+os.environ['CUDA_VISIBLE_DEVICES'] = "0,1"
 
 def _run_forwarding_in_subprocesses(config):
     use_cuda=strtobool(config['exp']['use_cuda'])
@@ -449,28 +449,3 @@ for data in forward_data_lst:
 # Saving Loss and Err as .txt and plotting curves
 if not is_production:
     create_curves(out_folder, N_ep, valid_data_lst)
-    
-    
-
-            
-            
-
-            
-
-
-
-   
-
-
-
-
-
-
-
-    
-
-    
-
-
-
-
