@@ -26,9 +26,10 @@ from distutils.util import strtobool
 import importlib
 import math
 import multiprocessing
+import time
 
 # set gpu devices
-os.environ['CUDA_VISIBLE_DEVICES'] = "0,1"
+os.environ['CUDA_VISIBLE_DEVICES'] = "1,3,4,5"
 
 def _run_forwarding_in_subprocesses(config):
     use_cuda=strtobool(config['exp']['use_cuda'])
@@ -115,7 +116,6 @@ run_nn=getattr(module, run_nn_script)
          
 # Splitting data into chunks (see out_folder/additional_files)
 create_lists(config)
-
 # Writing the config files
 create_configs(config)  
 
@@ -193,8 +193,6 @@ for ep in range(N_ep):
      
         # ***Epoch training***
         for ck in range(N_ck_tr):
-            
-            
             # paths of the output files (info,model,chunk_specific cfg file)
             info_file=out_folder+'/exp_files/train_'+tr_data+'_ep'+format(ep, N_ep_str_format)+'_ck'+format(ck, N_ck_str_format)+'.info'
             
@@ -215,16 +213,12 @@ for ep in range(N_ep):
             
             # if this chunk has not already been processed, do training...
             if not(os.path.exists(info_file)):
-                
                     print('Training %s chunk = %i / %i' %(tr_data,ck+1, N_ck_tr))
-                                 
                     # getting the next chunk 
                     next_config_file=cfg_file_list[op_counter]
 
-                        
-                    # run chunk processing                    
+                    # run chunk processing
                     [data_name,data_set,data_end_index,fea_dict,lab_dict,arch_dict]=run_nn(data_name,data_set,data_end_index,fea_dict,lab_dict,arch_dict,config_chunk_file,processed_first,next_config_file)
-                                        
                     
                     # update the first_processed variable
                     processed_first=False
@@ -362,9 +356,6 @@ for forward_data in forward_data_lst:
                  if not(os.path.exists(info_file)):
                      sys.stderr.write("ERROR: File %s does not exist. Forwarding did not suceed.\nSee %s \n" % (info_file,log_file))
                      sys.exit(0)
-                 
-               
-            
 # --------DECODING--------#
 dec_lst=glob.glob( out_folder+'/exp_files/*_to_decode.ark')
 

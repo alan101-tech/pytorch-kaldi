@@ -16,6 +16,7 @@ import torch
 from distutils.util import strtobool
 import time
 import threading
+from multiprocessing import Process, Manager
 import torch 
 
 from data_io import read_lab_fea,open_or_fd,write_mat
@@ -274,7 +275,7 @@ def run_nn_refac01(data_name,data_set,data_end_index,fea_dict,lab_dict,arch_dict
         beg_batch=end_batch
         end_batch=beg_batch+batch_size
         _update_progress_bar(to_do, i, N_batches, loss_sum)
-    elapsed_time_chunk=time.time() - start_time 
+    elapsed_time_chunk=time.time() - start_time
     loss_tot=loss_sum/N_batches
     err_tot=err_sum/N_batches
     del inp, ref, outs_dict, data_set_inp_dim, data_set_ref_dim
@@ -346,9 +347,12 @@ def run_nn(data_name,data_set,data_end_index,fea_dict,lab_dict,arch_dict,cfg_fil
     if processed_first:
         
         # Reading all the features and labels for this chunk
-        shared_list=[]
+        #shared_list=[]
+        manager = Manager()
+        shared_list = manager.list()
         
-        p=threading.Thread(target=read_lab_fea, args=(cfg_file,is_production,shared_list,output_folder,))
+        #p=threading.Thread(target=read_lab_fea, args=(cfg_file,is_production,shared_list,output_folder,))
+        p=Process(target=read_lab_fea, args=(cfg_file,is_production,shared_list,output_folder,))
         p.start()
         p.join()
         
@@ -359,8 +363,6 @@ def run_nn(data_name,data_set,data_end_index,fea_dict,lab_dict,arch_dict,cfg_fil
         arch_dict=shared_list[4]
         data_set=shared_list[5]
 
-
-        
         # converting numpy tensors into pytorch tensors and put them on GPUs if specified
         if not(save_gpumem) and use_cuda:
            data_set=torch.from_numpy(data_set).float().cuda()
@@ -368,8 +370,11 @@ def run_nn(data_name,data_set,data_end_index,fea_dict,lab_dict,arch_dict,cfg_fil
            data_set=torch.from_numpy(data_set).float()
                            
     # Reading all the features and labels for the next chunk
-    shared_list=[]
-    p=threading.Thread(target=read_lab_fea, args=(next_config_file,is_production,shared_list,output_folder,))
+    # shared_list=[]
+    manager = Manager()
+    shared_list = manager.list()
+    #p=threading.Thread(target=read_lab_fea, args=(next_config_file,is_production,shared_list,output_folder,))
+    p=Process(target=read_lab_fea, args=(next_config_file,is_production,shared_list,output_folder,))
     p.start()
     
     # Reading model and initialize networks
@@ -379,12 +384,10 @@ def run_nn(data_name,data_set,data_end_index,fea_dict,lab_dict,arch_dict,cfg_fil
        
     # optimizers initialization
     optimizers=optimizer_init(nns,config,arch_dict)
-           
     
     # pre-training and multi-gpu init
     for net in nns.keys():
       pt_file_arch=config[arch_dict[net][0]]['arch_pretrain_file']
-            
       if pt_file_arch!='none':        
           if use_cuda:
             checkpoint_load = torch.load(pt_file_arch)
@@ -393,15 +396,9 @@ def run_nn(data_name,data_set,data_end_index,fea_dict,lab_dict,arch_dict,cfg_fil
           nns[net].load_state_dict(checkpoint_load['model_par'])
           optimizers[net].load_state_dict(checkpoint_load['optimizer_par'])
           optimizers[net].param_groups[0]['lr']=float(config[arch_dict[net][0]]['arch_lr']) # loading lr of the cfg file for pt
-       
       if multi_gpu:
         nns[net] = torch.nn.DataParallel(nns[net])
-          
-    
-    
-    
     if to_do=='forward':
-        
         post_file={}
         for out_id in range(len(forward_outs)):
             if require_decodings[out_id]:
@@ -421,22 +418,16 @@ def run_nn(data_name,data_set,data_end_index,fea_dict,lab_dict,arch_dict,cfg_fil
     else:
         N_ex_tr=data_set.shape[0]
         N_batches=int(N_ex_tr/batch_size)
-        
-    
+        #print(N_ex_tr, batch_size)
     beg_batch=0
     end_batch=batch_size 
-    
     snt_index=0
     beg_snt=0 
-    
 
     start_time = time.time()
-    
     # array of sentence lengths
     arr_snt_len=shift(shift(data_end_index, -1,0)-data_end_index,1,0)
     arr_snt_len[0]=data_end_index[0]
-    
-    
     loss_sum=0
     err_sum=0
     
@@ -535,9 +526,7 @@ def run_nn(data_name,data_set,data_end_index,fea_dict,lab_dict,arch_dict,cfg_fil
           status_string="Forwarding | (Batch "+str(i+1)+"/"+str(N_batches)+")"
           
         progress(i, N_batches, status=status_string)
-    
     elapsed_time_chunk=time.time() - start_time 
-    
     loss_tot=loss_sum/N_batches
     err_tot=err_sum/N_batches
     
@@ -577,7 +566,7 @@ def run_nn(data_name,data_set,data_end_index,fea_dict,lab_dict,arch_dict,cfg_fil
     text_file.close()
     
     
-    # Getting the data for the next chunk (read in parallel)    
+    # Getting the data for the next chunk (read in parallel)   
     p.join()
     data_name=shared_list[0]
     data_end_index=shared_list[1]
@@ -592,6 +581,5 @@ def run_nn(data_name,data_set,data_end_index,fea_dict,lab_dict,arch_dict,cfg_fil
        data_set=torch.from_numpy(data_set).float().cuda()
     else:
        data_set=torch.from_numpy(data_set).float()
-       
        
     return [data_name,data_set,data_end_index,fea_dict,lab_dict,arch_dict]

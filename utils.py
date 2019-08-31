@@ -946,6 +946,21 @@ def create_lists(config):
     seed=int(config['exp']['seed'])
     N_ep=int(config['exp']['N_epochs_tr'])    
     N_ep_str_format='0'+str(int(max(math.ceil(np.log10(N_ep)),1)))+'d'
+
+    # yjsi add for reading post.scp
+    data = config['dataset1']['data_name']
+    [lab_names,lab_folders,lab_opts]=parse_lab_field(config[cfg_item2sec(config,'data_name',data)]['lab'])
+    post_dict = {}
+    lab_folder = lab_folders[0]
+    if os.path.exists(lab_folder + '/post.scp'):
+      with open(lab_folder + '/post.scp', 'r') as f_post:
+        for line in f_post:
+          line = line.strip()
+          if not line:
+            continue
+
+          key = line.split(' ', 1)[0]
+          post_dict[key] = line
     
     # Setting the random seed
     random.seed(seed)
@@ -988,6 +1003,15 @@ def create_lists(config):
                         #print(snt.split(',')[i])
                         tr_chunks_fea_split.append(snt.split(',')[i])
                     output_lst_file=out_folder+'/exp_files/train_'+dataset+'_ep'+format(ep,  N_ep_str_format)+'_ck'+format(ck, N_ck_str_format)+'_'+fea_names[i]+'.lst'
+                    # yjsi add for write chunk post file
+                    if os.path.exists(lab_folder + '/post.scp'):
+                      output_post_file = output_lst_file + '.post'
+                      f_post = open(output_post_file, 'w')
+                      for line in tr_chunks_fea_split:
+                        key = line.strip().split()[0]
+                        if post_dict.has_key(key):
+                          f_post.write(post_dict[key] + '\n')
+                      f_post.close()
                     f=open(output_lst_file,'w')
                     tr_chunks_fea_wr=map(lambda x:x+'\n', tr_chunks_fea_split)
                     f.writelines(tr_chunks_fea_wr)
@@ -1006,11 +1030,19 @@ def create_lists(config):
                                 for snt in valid_chunks_fea[ck_val]:
                                     valid_chunks_fea_split.append(snt.split(',')[fea_idx])
                                 output_lst_file = get_val_lst_file_path(out_folder, dataset_val, ep, ck, ck_val, fea_names[fea_idx], N_ep_str_format, N_ck_str_format, N_ck_str_format_val)
+                                # yjsi add for write chunk post file
+                                if os.path.exists(lab_folder + '/post.scp'):
+                                  output_post_file = output_lst_file + '.post'
+                                  f_post = open(output_post_file, 'w')
+                                  for line in valid_chunks_fea_split:
+                                    key = line.strip().split()[0]
+                                    if post_dict.has_key(key):
+                                      f_post.write(post_dict[key] + '\n')
+                                  f_post.close()
                                 f=open(output_lst_file,'w')
                                 valid_chunks_fea_wr=map(lambda x:x+'\n', valid_chunks_fea_split)
                                 f.writelines(valid_chunks_fea_wr)
                                 f.close()
-                    
     # forward chunk lists creation    
     forward_data_name=config['data_use']['forward_with'].split(',')
     
@@ -1617,7 +1649,6 @@ def dict_fea_lab_arch(config, fea_only):
     
     for line in model:
         [out_name,operation,inp1,inp2]=list(re.findall(pattern,line)[0])
-        print(line)
         
         if inp1 in fea_lst and inp1 not in fea_lst_used_name :
             pattern_fea="fea_name="+inp1+"\nfea_lst=(.*)\nfea_opts=(.*)\ncw_left=(.*)\ncw_right=(.*)"

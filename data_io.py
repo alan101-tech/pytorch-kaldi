@@ -11,6 +11,19 @@ from utils import compute_cw_max,dict_fea_lab_arch,is_sequential_dict
 import os
 import configparser
 import re, gzip, struct
+import time
+
+def get_chunk_post(post_file, fea, post_chunk_file):
+  f_post_chunk = open(post_chunk_file, 'w')
+  with open(post_file, 'r') as f_post:
+    for line in f_post:
+      line = line.strip()
+      if not line:
+        continue
+      key = line.split(' ')[0]
+      if key in fea:
+        f_post_chunk.write(line + '\n')
+  f_post_chunk.close()
 
 def load_dataset(fea_scp,fea_opts,lab_folder,lab_opts,left,right, max_sequence_length, output_folder, fea_only=False):
     def _input_is_wav_file(fea_scp):
@@ -33,9 +46,13 @@ def load_dataset(fea_scp,fea_opts,lab_folder,lab_opts,left,right, max_sequence_l
             read_function = read_vec_flt_ark
         fea = { k:m for k,m in read_function('ark:'+kaldi_bin+' scp:'+fea_scp+' ark:- |'+fea_opts,output_folder) }
         if not fea_only:
-            lab = { k:v for k,v in read_vec_int_ark('gunzip -c '+lab_folder+'/ali*.gz | '+lab_opts+' '+lab_folder+'/final.mdl ark:- ark:-|',output_folder)  if k in fea} # Note that I'm copying only the aligments of the loaded fea
+            if os.path.exists(lab_folder + '/post.scp'):
+              lab = { k:v for k,v in read_vec_int_ark( 'copy-int-vector scp:' + fea_scp + '.post' +
+                ' ark:- |', output_folder)} # Note that I'm copying only the aligments of the loaded fea
+            else:
+              lab = { k:v for k,v in read_vec_int_ark('gunzip -c '+lab_folder+'/ali*.gz | '+lab_opts+' '+lab_folder+'/final.mdl ark:- ark:-|',output_folder)  if k in fea} # Note that I'm copying only the aligments of the loaded fea
             fea = {k: v for k, v in fea.items() if k in lab} # This way I remove all the features without an aligment (see log file in alidir "Did not Succeded")
-        return fea, lab
+            return fea, lab
     def _chunk_features_and_labels(max_sequence_length, fea, lab, fea_only, input_is_wav):
         def _append_to_concat_list(fea_chunked, lab_chunked, fea_conc, lab_conc, name):
             for j in range(0, len(fea_chunked)):
@@ -217,7 +234,7 @@ def load_chunk(fea_scp,fea_opts,lab_folder,lab_opts,left,right,max_sequence_leng
   end_index_fea[-1]=end_index_fea[-1]-right
 
   # mean and variance normalization
-  #data_set=(data_set-np.mean(data_set,axis=0))/np.std(data_set,axis=0)
+  ##data_set=(data_set-np.mean(data_set,axis=0))/np.std(data_set,axis=0)
 
   # Label processing
   data_lab=data_lab-data_lab.min()
@@ -225,7 +242,7 @@ def load_chunk(fea_scp,fea_opts,lab_folder,lab_opts,left,right,max_sequence_leng
     data_lab=data_lab[left:-right]
   else:
     data_lab=data_lab[left:]   
-  
+
   data_set=np.column_stack((data_set, data_lab))
 
   return [data_name,data_set,end_index_fea]
@@ -406,7 +423,6 @@ def read_lab_fea_refac01(cfg_file, fea_only, shared_list, output_folder):
     shared_list = _append_to_shared_list(shared_list, data_name, data_end_index_fea, data_end_index_lab, fea_dict, lab_dict, arch_dict, data_set)
 
 def read_lab_fea(cfg_file,fea_only,shared_list,output_folder):
-    
     # Reading chunk-specific cfg file (first argument-mandatory file) 
     if not(os.path.exists(cfg_file)):
          sys.stderr.write('ERROR: The config file %s does not exist!\n'%(cfg_file))
@@ -456,41 +472,30 @@ def read_lab_fea(cfg_file,fea_only,shared_list,output_folder):
               lab_opts=lab_dict[lab][2]
     
             [data_name_fea,data_set_fea,data_end_index_fea]=load_chunk(fea_scp,fea_opts,lab_folder,lab_opts,cw_left,cw_right,max_seq_length, output_folder, fea_only)
-    
-            
             # making the same dimenion for all the features (compensating for different context windows)
             labs_fea=data_set_fea[cw_left_max-cw_left:data_set_fea.shape[0]-(cw_right_max-cw_right),-1]
             data_set_fea=data_set_fea[cw_left_max-cw_left:data_set_fea.shape[0]-(cw_right_max-cw_right),0:-1]
             data_end_index_fea=data_end_index_fea-(cw_left_max-cw_left)
             data_end_index_fea[-1]=data_end_index_fea[-1]-(cw_right_max-cw_right)
-    
-            
-            
             if cnt_fea==0 and cnt_lab==0:
                 data_set=data_set_fea
                 labs=labs_fea
                 data_end_index=data_end_index_fea
                 data_end_index=data_end_index_fea
                 data_name=data_name_fea
-                
                 fea_dict[fea].append(fea_index)
                 fea_index=fea_index+data_set_fea.shape[1]
                 fea_dict[fea].append(fea_index)
                 fea_dict[fea].append(fea_dict[fea][6]-fea_dict[fea][5])
-                
-                
             else:
                 if cnt_fea==0:
                     labs=np.column_stack((labs,labs_fea))
-                
                 if cnt_lab==0:
                     data_set=np.column_stack((data_set,data_set_fea))
                     fea_dict[fea].append(fea_index)
                     fea_index=fea_index+data_set_fea.shape[1]
                     fea_dict[fea].append(fea_index)
                     fea_dict[fea].append(fea_dict[fea][6]-fea_dict[fea][5])
-                
-                
                 # Checks if lab_names are the same for all the features
                 if not(data_name==data_name_fea):
                     sys.stderr.write('ERROR: different sentence ids are detected for the different features. Plase check again input feature lists"\n')
@@ -1051,13 +1056,13 @@ def read_cnet_ark(file_or_fd,output_folder):
   """ Alias of function 'read_post_ark()', 'cnet' = confusion network """
   return read_post_ark(file_or_fd,output_folder)
 
-def read_post_rxspec(file_):
+def read_post_rxspec(file_, output_folder):
   """ adaptor to read both 'ark:...' and 'scp:...' inputs of posteriors,
   """
   if file_.startswith("ark:"):
-      return read_post_ark(file_)
+      return read_post_ark(file_, output_folder)
   elif file_.startswith("scp:"):
-      return read_post_scp(file_)
+      return read_post_scp(file_, output_folder)
   else:
       print("unsupported intput type: %s" % file_)
       print("it should begint with 'ark:' or 'scp:'")
@@ -1079,7 +1084,7 @@ def read_post_scp(file_or_fd,output_folder):
   try:
     for line in fd:
       (key,rxfile) = line.decode().split(' ')
-      post = read_post(rxfile)
+      post = read_post(rxfile, output_folder)
       yield key, post
   finally:
     if fd is not file_or_fd : fd.close()
@@ -1131,9 +1136,11 @@ def read_post(file_or_fd,output_folder):
     data = np.frombuffer(fd.read(inner_vec_size*10), dtype=[('size_idx','int8'),('idx','int32'),('size_post','int8'),('post','float32')], count=inner_vec_size)
     assert(data[0]['size_idx'] == 4)
     assert(data[0]['size_post'] == 4)
-    ans.append(data[['idx','post']].tolist())
+    #ans.append(data[['idx','post']].tolist())
+    ans.append(data['idx'].tolist()[0])
 
   if fd is not file_or_fd: fd.close()
+  ans = np.asarray(ans)
   return ans
 
 
