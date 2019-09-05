@@ -29,7 +29,7 @@ import multiprocessing
 import time
 
 # set gpu devices
-os.environ['CUDA_VISIBLE_DEVICES'] = "1,3,4,5"
+os.environ['CUDA_VISIBLE_DEVICES'] = "0,1"
 
 def _run_forwarding_in_subprocesses(config):
     use_cuda=strtobool(config['exp']['use_cuda'])
@@ -115,7 +115,7 @@ run_nn=getattr(module, run_nn_script)
          
          
 # Splitting data into chunks (see out_folder/additional_files)
-create_lists(config)
+#create_lists(config)
 # Writing the config files
 create_configs(config)  
 
@@ -210,7 +210,6 @@ for ep in range(N_ep):
             # update learning rate in the cfg file (if needed)
             change_lr_cfg(config_chunk_file,lr,ep)
                         
-            
             # if this chunk has not already been processed, do training...
             if not(os.path.exists(info_file)):
                     print('Training %s chunk = %i / %i' %(tr_data,ck+1, N_ck_tr))
@@ -218,7 +217,9 @@ for ep in range(N_ep):
                     next_config_file=cfg_file_list[op_counter]
 
                     # run chunk processing
+                    st = time.time()
                     [data_name,data_set,data_end_index,fea_dict,lab_dict,arch_dict]=run_nn(data_name,data_set,data_end_index,fea_dict,lab_dict,arch_dict,config_chunk_file,processed_first,next_config_file)
+                    print('run_nn time is %.2f' % (time.time() - st))
                     
                     # update the first_processed variable
                     processed_first=False

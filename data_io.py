@@ -12,6 +12,7 @@ import os
 import configparser
 import re, gzip, struct
 import time
+import itertools
 
 def get_chunk_post(post_file, fea, post_chunk_file):
   f_post_chunk = open(post_chunk_file, 'w')
@@ -44,11 +45,15 @@ def load_dataset(fea_scp,fea_opts,lab_folder,lab_opts,left,right, max_sequence_l
         elif _input_is_wav_file(fea_scp):
             kaldi_bin="wav-copy"
             read_function = read_vec_flt_ark
+        s_t = time.time()
         fea = { k:m for k,m in read_function('ark:'+kaldi_bin+' scp:'+fea_scp+' ark:- |'+fea_opts,output_folder) }
+        print('read fea time is %.2f' % (time.time() - s_t))
         if not fea_only:
             if os.path.exists(lab_folder + '/post.scp'):
+              s_t = time.time()
               lab = { k:v for k,v in read_vec_int_ark( 'copy-int-vector scp:' + fea_scp + '.post' +
                 ' ark:- |', output_folder)} # Note that I'm copying only the aligments of the loaded fea
+              print('read_vec_int_ark time is %.2f' % (time.time() - s_t))
             else:
               lab = { k:v for k,v in read_vec_int_ark('gunzip -c '+lab_folder+'/ali*.gz | '+lab_opts+' '+lab_folder+'/final.mdl ark:- ark:-|',output_folder)  if k in fea} # Note that I'm copying only the aligments of the loaded fea
             fea = {k: v for k, v in fea.items() if k in lab} # This way I remove all the features without an aligment (see log file in alidir "Did not Succeded")
@@ -204,12 +209,13 @@ def context_window_old(fea,left,right):
  return frames
 
 def context_window(fea,left,right):
- 
     N_elem=fea.shape[0]
     N_fea=fea.shape[1]
-    
-    fea_conc=np.empty([N_elem,N_fea*(left+right+1)])
-    
+   
+    # fea_conc must be np.float32 type in order to speed upload gpu time
+    fea_conc=np.empty([N_elem,N_fea*(left+right+1)+1], dtype=np.float32)
+    #fea_conc=fea_conc[left:fea_conc.shape[0]-right]
+    #return fea_conc
     index_fea=0
     for lag in range(-left,right+1):
         fea_conc[:,index_fea:index_fea+fea.shape[1]]=np.roll(fea,-lag,axis=0)
@@ -222,13 +228,17 @@ def context_window(fea,left,right):
 def load_chunk(fea_scp,fea_opts,lab_folder,lab_opts,left,right,max_sequence_length, output_folder,fea_only=False):
   
   # open the file
+  st = time.time()
   [data_name,data_set,data_lab,end_index_fea,end_index_lab]=load_dataset(fea_scp,fea_opts,lab_folder,lab_opts,left,right, max_sequence_length, output_folder, fea_only)
+  print('load_dataset time is %.2f' % (time.time() - st))
 
   # TODO: currently end_index_lab is ignored
 
   # Context window
+  st = time.time()
   if left!=0 or right!=0:
       data_set=context_window(data_set,left,right)
+  print('context_window time is %d' % (time.time() - st))
 
   end_index_fea=end_index_fea-left
   end_index_fea[-1]=end_index_fea[-1]-right
@@ -243,9 +253,12 @@ def load_chunk(fea_scp,fea_opts,lab_folder,lab_opts,left,right,max_sequence_leng
   else:
     data_lab=data_lab[left:]   
 
-  data_set=np.column_stack((data_set, data_lab))
+  if left!=0 or right!=0:
+    data_set[:, -1] = data_lab[:]
+  else:
+    data_set=np.column_stack((data_set, data_lab))
 
-  return [data_name,data_set,end_index_fea]
+  return [data_name, data_set, end_index_fea]
 
 def load_counts(class_counts_file):
     with open(class_counts_file) as f:
@@ -471,16 +484,18 @@ def read_lab_fea(cfg_file,fea_only,shared_list,output_folder):
               lab_folder=lab_dict[lab][1]
               lab_opts=lab_dict[lab][2]
     
-            [data_name_fea,data_set_fea,data_end_index_fea]=load_chunk(fea_scp,fea_opts,lab_folder,lab_opts,cw_left,cw_right,max_seq_length, output_folder, fea_only)
+            #[data_name_fea,data_set_fea,data_end_index_fea]=load_chunk(fea_scp,fea_opts,lab_folder,lab_opts,cw_left,cw_right,max_seq_length, output_folder, fea_only)
+            st = time.time()
+            [data_name_fea, data_set_fea_lab, data_end_index_fea]=load_chunk(fea_scp,fea_opts,lab_folder,lab_opts,cw_left,cw_right,max_seq_length, output_folder, fea_only)
+            print('load_chunk time is %.2f' % (time.time() - st))
             # making the same dimenion for all the features (compensating for different context windows)
-            labs_fea=data_set_fea[cw_left_max-cw_left:data_set_fea.shape[0]-(cw_right_max-cw_right),-1]
-            data_set_fea=data_set_fea[cw_left_max-cw_left:data_set_fea.shape[0]-(cw_right_max-cw_right),0:-1]
+            labs_fea=data_set_fea_lab[cw_left_max-cw_left:data_set_fea_lab.shape[0]-(cw_right_max-cw_right),-1]
+            data_set_fea=data_set_fea_lab[cw_left_max-cw_left:data_set_fea_lab.shape[0]-(cw_right_max-cw_right),0:-1]
             data_end_index_fea=data_end_index_fea-(cw_left_max-cw_left)
             data_end_index_fea[-1]=data_end_index_fea[-1]-(cw_right_max-cw_right)
             if cnt_fea==0 and cnt_lab==0:
                 data_set=data_set_fea
                 labs=labs_fea
-                data_end_index=data_end_index_fea
                 data_end_index=data_end_index_fea
                 data_name=data_name_fea
                 fea_dict[fea].append(fea_index)
@@ -488,6 +503,7 @@ def read_lab_fea(cfg_file,fea_only,shared_list,output_folder):
                 fea_dict[fea].append(fea_index)
                 fea_dict[fea].append(fea_dict[fea][6]-fea_dict[fea][5])
             else:
+                pass
                 if cnt_fea==0:
                     labs=np.column_stack((labs,labs_fea))
                 if cnt_lab==0:
@@ -516,15 +532,26 @@ def read_lab_fea(cfg_file,fea_only,shared_list,output_folder):
       for lab in lab_dict.keys():
           lab_dict[lab].append(data_set.shape[1]+cnt_lab)
           cnt_lab=cnt_lab+1
-           
-    data_set=np.column_stack((data_set,labs))
+    
+    #data_set=np.column_stack((data_set,labs))
+    data_set = data_set_fea_lab
     
     # check automatically if the model is sequential
     seq_model=is_sequential_dict(config,arch_dict)
     
     # Randomize if the model is not sequential
+    st = time.time()
     if not(seq_model) and to_do!='forward':
+       # frame_num = data_set.shape[0]
+       # cur_num = 0
+       # while cur_num < frame_num:
+       #   to_num = cur_num + 50000
+       #   if to_num > frame_num:
+       #     to_num = frame_num
+       #   np.random.shuffle(data_set[cur_num:to_num,:])
+       #   cur_num = to_num
         np.random.shuffle(data_set)
+    print('shuffle time is %.2f' % (time.time() - st))
      
     # Split dataset in many part. If the dataset is too big, we can have issues to copy it into the shared memory (due to pickle limits)
     #N_split=10

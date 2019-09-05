@@ -347,12 +347,11 @@ def run_nn(data_name,data_set,data_end_index,fea_dict,lab_dict,arch_dict,cfg_fil
     if processed_first:
         
         # Reading all the features and labels for this chunk
-        #shared_list=[]
-        manager = Manager()
-        shared_list = manager.list()
-        
-        #p=threading.Thread(target=read_lab_fea, args=(cfg_file,is_production,shared_list,output_folder,))
-        p=Process(target=read_lab_fea, args=(cfg_file,is_production,shared_list,output_folder,))
+        shared_list=[]
+        p=threading.Thread(target=read_lab_fea, args=(cfg_file,is_production,shared_list,output_folder,))
+        #manager = Manager()
+        #shared_list = manager.list()
+        #p=Process(target=read_lab_fea, args=(cfg_file,is_production,shared_list,output_folder,))
         p.start()
         p.join()
         
@@ -370,11 +369,11 @@ def run_nn(data_name,data_set,data_end_index,fea_dict,lab_dict,arch_dict,cfg_fil
            data_set=torch.from_numpy(data_set).float()
                            
     # Reading all the features and labels for the next chunk
-    # shared_list=[]
-    manager = Manager()
-    shared_list = manager.list()
-    #p=threading.Thread(target=read_lab_fea, args=(next_config_file,is_production,shared_list,output_folder,))
-    p=Process(target=read_lab_fea, args=(next_config_file,is_production,shared_list,output_folder,))
+    shared_list=[]
+    p=threading.Thread(target=read_lab_fea, args=(next_config_file,is_production,shared_list,output_folder,))
+    #manager = Manager()
+    #shared_list = manager.list()
+    #p=Process(target=read_lab_fea, args=(next_config_file,is_production,shared_list,output_folder,))
     p.start()
     
     # Reading model and initialize networks
@@ -566,8 +565,11 @@ def run_nn(data_name,data_set,data_end_index,fea_dict,lab_dict,arch_dict,cfg_fil
     text_file.close()
     
     
-    # Getting the data for the next chunk (read in parallel)   
+    # Getting the data for the next chunk (read in parallel)
+    st = time.time()
     p.join()
+    print('read time is %.2f' % (time.time() - st))
+    st = time.time()
     data_name=shared_list[0]
     data_end_index=shared_list[1]
     fea_dict=shared_list[2]
@@ -578,8 +580,10 @@ def run_nn(data_name,data_set,data_end_index,fea_dict,lab_dict,arch_dict,cfg_fil
     
     # converting numpy tensors into pytorch tensors and put them on GPUs if specified
     if not(save_gpumem) and use_cuda:
-       data_set=torch.from_numpy(data_set).float().cuda()
+       #data_set=torch.from_numpy(data_set).float().cuda()
+       print(data_set.dtype)
+       data_set=torch.from_numpy(data_set).cuda()
     else:
        data_set=torch.from_numpy(data_set).float()
-       
+    print('to gpu time is %.2f' % (time.time() - st))
     return [data_name,data_set,data_end_index,fea_dict,lab_dict,arch_dict]

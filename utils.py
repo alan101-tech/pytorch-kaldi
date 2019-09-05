@@ -2007,8 +2007,6 @@ def forward_model(fea_dict,lab_dict,arch_dict,model,nns,costs,inp,inp_out_dict,m
         if len(inp.shape)==2 and len(fea_dict[fea])>1:
             outs_dict[fea]=inp[:,fea_dict[fea][5]:fea_dict[fea][6]]
 
-    
-    
     for line in model:
         [out_name,operation,inp1,inp2]=list(re.findall(pattern,line)[0])
 
